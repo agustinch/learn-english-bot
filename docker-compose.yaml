@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+  # Python application service
+  python-app:
+    build:
+      context: ./app # Path to your Python application Dockerfile
+      dockerfile: ./Dockerfile
+    restart: always
+    volumes:
+      - ./app:/code
+    ports:
+      - '80:80'
+    depends_on:
+      - mongodb
+    links:
+      - mongodb
+  cron-job:
+    build:
+      context: ./cron-job # Path to your Python application Dockerfile
+      dockerfile: ./Dockerfile
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    depends_on:
+      - mongodb
+      - rabbitmq
+  notification-wp:
+    build:
+      context: ./notification-wp # Path to your Python application Dockerfile
+      dockerfile: ./Dockerfile
+    depends_on:
+      - rabbitmq
+  rabbitmq:
+    image: rabbitmq:3.8.15-rc.2-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+  # MongoDB service
+  mongodb:
+    image: mongo:latest
+    ports:
+      - '27017:27017'
+    restart: always
+    volumes:
+      - 'mongo-db:/data/db'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_DATABASE: goals
+
+volumes:
+  mongo-db:
