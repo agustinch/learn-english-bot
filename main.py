@@ -46,7 +46,6 @@ async def get_definition(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text('Please provide a word. Example: /d hello')
         return
 
-    # Replace this with your logic to get the definition of the word
     definitions, audio = get_longman_definition(word)
     await update.message.reply_text(f'Definitions of *"{word}"*:', parse_mode=ParseMode.MARKDOWN)
 
@@ -76,19 +75,12 @@ async def get_all_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main() -> None:
     """Start the bot."""
-    # Create the Application and pass it your bot's token.
     application = Application.builder().token(os.getenv('TELEGRAM_TOKEN')).build()
 
-    # Interpret any other command or text message as a start of a private chat.
-    # This will record the user as being in a private chat with bot.
+    
     application.add_handler(CommandHandler('d', get_definition))
     application.add_handler(CommandHandler('words', get_all_words))
-
     application.add_handler(MessageHandler(filters.ALL, start_private_chat))
-
-    # Run the bot until the user presses Ctrl-C
-    # We pass 'allowed_updates' handle *all* updates including `chat_member` updates
-    # To reset this, simply pass `allowed_updates=[]`
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
