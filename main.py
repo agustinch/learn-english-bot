@@ -1,16 +1,4 @@
 #!/usr/bin/env python
-# pylint: disable=unused-argument
-# This program is dedicated to the public domain under the CC0 license.
-
-"""
-Simple Bot to handle '(my_)chat_member' updates.
-Greets new users & keeps track of which chats the bot is in.
-
-Usage:
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
-
 import logging
 from typing import Optional, Tuple
 from scrapping import get_longman_definition
@@ -25,34 +13,33 @@ from telegram.ext import (
     filters,
 )
 import requests
+import os
+from dotenv import load_dotenv
 
-# Enable logging
+load_dotenv()
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-# set higher logging level for httpx to avoid all GET and POST requests being logged
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
 
 async def start_private_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Greets the user and records that they started a chat with the bot if it's a private chat.
-    Since no `my_chat_member` update is issued when a user starts a private chat with the bot
-    for the first time, we have to track it explicitly here.
-    """
     user_name = update.effective_user.full_name
-
-
+    chat_id = update.effective_chat.id
+    if chat_id in context.bot_data.get("user_ids", set()):
+        await update.message.reply_text(f"{user_name}, please provide a word. Example: /d hello")
+        return
     logger.info("%s started a private chat with the bot", user_name)
-
+    context.bot_data.setdefault("user_ids", set()).add(chat_id)
     await update.effective_message.reply_text(
         f"Welcome {user_name}. Use /d to get word definition from Longman. Example: /d understand"
     )
 
-async def get_definition(update: Update, context):
+async def get_definition(update: Update, context: ContextTypes.DEFAULT_TYPE):
     word = context.args[0] if context.args else None
 
     if not word:
@@ -72,17 +59,30 @@ async def get_definition(update: Update, context):
         audio_file = requests.get(audio, headers=headers)
         await update.message.reply_audio(audio=audio_file.content, title=f'Pronunciation of {word}')
 
+    context.bot_data.setdefault("words", set()).add(context.bot_data.get("words", set()).add(word))
+
+
+async def get_all_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    words = [item for item in context.bot_data.get("words", set()) if item is not None]
+    list_words = '\n'.join(words)
+    if not words:
+        await update.message.reply_text(f"You need to use /d to start")
+        return
+    await update.message.reply_text(f"You learnt these words:\n\n{list_words}")
+
+
+    
+
 
 def main() -> None:
     """Start the bot."""
     # Create the Application and pass it your bot's token.
-    application = Application.builder().token('').build()
-
-
+    application = Application.builder().token(os.getenv('TELEGRAM_TOKEN')).build()
 
     # Interpret any other command or text message as a start of a private chat.
     # This will record the user as being in a private chat with bot.
     application.add_handler(CommandHandler('d', get_definition))
+    application.add_handler(CommandHandler('words', get_all_words))
 
     application.add_handler(MessageHandler(filters.ALL, start_private_chat))
 
